@@ -5,19 +5,25 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 )
 
 func main() {
-	iChan := scanner()
-	sqChan := square(iChan)
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	iChan := scanner(&wg)
+	sqChan := square(&wg, iChan)
 	multiplier(sqChan)
+	wg.Wait()
 }
 
-func scanner() chan int {
+func scanner(wg *sync.WaitGroup) chan int {
 	s := bufio.NewScanner(os.Stdin)
 	iChan := make(chan int)
 	fmt.Println("Введите число или \"стоп\" для остановки программы")
 	go func() {
+		defer wg.Done()
 		for s.Scan() && s.Text() != "стоп" {
 			num, err := strconv.Atoi(s.Text())
 			if err != nil {
@@ -33,10 +39,11 @@ func scanner() chan int {
 	return iChan
 }
 
-func square(iChan chan int) chan int {
+func square(wg *sync.WaitGroup, iChan chan int) chan int {
 	sqChan := make(chan int)
 
 	go func() {
+		defer wg.Done()
 		for n := range iChan {
 			sqChan <- n * n
 			fmt.Println("Квадрат:", n*n)

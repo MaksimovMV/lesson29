@@ -7,12 +7,9 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
-	"time"
 )
 
 func main() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -21,16 +18,12 @@ func main() {
 	go func() {
 		defer wg.Done()
 		for {
-			select {
-			case <-c:
-				fmt.Println("Выхожу из программы")
+			num, ok := <-intChan
+			if !ok {
+				fmt.Println("До свидания")
 				return
-			case num, ok := <-intChan:
-				if !ok {
-					return
-				}
-				fmt.Println("Квадрат числа:", num*num)
 			}
+			fmt.Println("Квадрат числа:", num*num)
 		}
 	}()
 
@@ -42,17 +35,24 @@ func scanner(wg *sync.WaitGroup) chan int {
 	s := bufio.NewScanner(os.Stdin)
 	iChan := make(chan int)
 	fmt.Println("Введите число или \"стоп\" для закрытия программы")
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
 	go func() {
-		for s.Scan() && s.Text() != "стоп" {
-			num, err := strconv.Atoi(s.Text())
-			if err != nil {
-				fmt.Println("Некорректный ввод")
-				continue
+		for s.Scan() {
+			select {
+			case <-c:
+				fmt.Println("Выхожу из программы")
+				break
+			default:
+				num, err := strconv.Atoi(s.Text())
+				if err != nil {
+					fmt.Println("Некорректный ввод")
+					continue
+				}
+				fmt.Println("Ввод:", num)
+				iChan <- num
 			}
-			fmt.Println("Ввод:", num)
-			iChan <- num
 		}
-		time.Sleep(time.Second)
 		close(iChan)
 		wg.Done()
 	}()
